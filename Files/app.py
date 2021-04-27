@@ -1,5 +1,3 @@
-import numpy as np
-
 import sqlalchemy
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
@@ -37,8 +35,11 @@ def welcome():
     """List all available api routes."""
     return (
         f"Available Routes:<br/>"
-        f"/api/v1.0/names<br/>"
-        f"/api/v1.0/passengers"
+        f"/api/v1.0/precipitation<br/>"
+        f"/api/v1.0/stations<br/>"
+        f"/api/v1.0/tobs<br/>"
+        f"/api/v1.0/start-date<br/>"
+        f"/api/v1.0/start-date/end-date"
     )
 
 
@@ -47,13 +48,12 @@ def precipitation():
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    """Return a list of passenger data including the name, age, and sex of each passenger"""
-    # Query all passengers
+
     results = session.query(measurement.date, measurement.prcp).all()
 
     session.close()
 
-    # Create a dictionary from the row data and append to a list of all_passengers
+
     all_prcp = []
     for date, prcp in results:
         prcp_dict = {}
@@ -70,14 +70,12 @@ def precipitation():
 def stations():
     # Create our session (link) from Python to the DB
     session = Session(engine)
-
-    """Return a list of passenger data including the name, age, and sex of each passenger"""
-    # Query all passengers
+    station = Base.classes.station
     results = session.query(station.station, station.name, station.latitude, station.longitude, station.elevation).all()
 
     session.close()
 
-    # Create a dictionary from the row data and append to a list of all_passengers
+
     all_stations = []
     for station, name, latitude, longitude, elevation in results:
         station_dict = {}
@@ -95,8 +93,6 @@ def tobs():
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    """Return a list of passenger data including the name, age, and sex of each passenger"""
-    # Query all passengers
     most_active = session.query(measurement.date, measurement.tobs).\
                    filter(measurement.station == 'USC00519281').all()
     tobs_rows = [{"Date": result[0], "tobs": result[1]} for result in most_active]
@@ -104,6 +100,29 @@ def tobs():
     session.close()
 
     return jsonify(tobs_rows)
+
+
+@app.route("/api/v1.0/<start>")
+def startDateOnly(start):
+    session = Session(engine)
+    
+    results = session.query(func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)).filter(measurement.date >= start).all()
+    single_rows = [{"Min": result[0], "Average": result[1], "Max": result[2]} for result in results]
+    session.close()
+
+    return jsonify(single_rows)
+
+
+
+@app.route("/api/v1.0/<start>/<end>")
+def startDateEndDate(start,end):
+    session = Session(engine)
+
+    results = session.query(func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)).filter(measurement.date >= start).filter(measurement.date <= end).all()
+    multi_rows = [{"Min": result[0], "Average": result[1], "Max": result[2]} for result in results]
+    session.close()
+
+    return jsonify(multi_rows)
 
 if __name__ == '__main__':
     app.run(debug=True)
